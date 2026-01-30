@@ -1,87 +1,93 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yoga Attendance Portal</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro elettronico 📒</title>
 
-    <style>
-        body {
-            font-family: system-ui, sans-serif;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+<style>
+body {
+  font-family: system-ui, sans-serif;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
 
-        .login-screen, .dashboard-screen {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            width: 100%;
-            max-width: 400px;
-        }
+.card {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 420px;
+}
 
-        .dashboard-screen {
-            display: none;
-        }
+.hidden { display: none; }
 
-        input, button {
-            width: 100%;
-            padding: 10px;
-            margin-top: 10px;
-        }
+button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
 
-        button {
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 6px;
-        }
+input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+}
 
-        ul {
-            list-style: none;
-            padding: 0;
-        }
+ul {
+  list-style: none;
+  padding: 0;
+}
 
-        li::before {
-            content: "✓ ";
-            color: green;
-        }
+li::before {
+  content: "✓ ";
+  color: green;
+}
 
-        .error {
-            color: red;
-            margin-top: 10px;
-        }
-    </style>
+.error { color: red; margin-top: 10px; }
+</style>
 </head>
 
 <body>
 
-<div class="login-screen" id="loginScreen">
-    <h2>🧘 Yoga Attendance</h2>
-
-    <input id="username" placeholder="Nome Cognome">
-    <input id="password" type="password" placeholder="Password">
-    <button onclick="login()">Accedi</button>
-
-    <div class="error" id="errorMsg"></div>
+<!-- LOGIN -->
+<div class="card" id="loginScreen">
+  <h2>Registro elettronico 📒</h2>
+  <input id="username" placeholder="Nome Cognome">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="login()">Accedi</button>
+  <div class="error" id="errorMsg"></div>
 </div>
 
-<div class="dashboard-screen" id="dashboardScreen">
-    <h2 id="userNameDisplay"></h2>
-    <p id="activityDisplay"></p>
+<!-- ALLIEVO -->
+<div class="card hidden" id="studentDashboard">
+  <h3 id="studentName"></h3>
+  <p id="studentActivity"></p>
 
-    <p>Totale lezioni: <b id="totalLessons"></b></p>
-    <p>Presenze: <b id="attendedLessons"></b></p>
-    <p>Rimanenti: <b id="remainingLessons"></b></p>
-    <p>Progressione: <b id="progressPercent"></b></p>
+  <p>Totale lezioni: <b id="totalLessons"></b></p>
+  <p>Presenze: <b id="attendedLessons"></b></p>
+  <p>Rimanenti: <b id="remainingLessons"></b></p>
+  <p>Progressione: <b id="progressPercent"></b></p>
 
-    <h3>Presenze</h3>
-    <ul id="attendanceList"></ul>
+  <h4>Presenze</h4>
+  <ul id="attendanceList"></ul>
 
-    <button onclick="logout()">Esci</button>
+  <button onclick="logout()">Esci</button>
+</div>
+
+<!-- INSEGNANTE -->
+<div class="card hidden" id="teacherDashboard">
+  <h3>👩‍🏫 Modalità Insegnante</h3>
+  <ul id="teacherList"></ul>
+  <button onclick="logout()">Esci</button>
 </div>
 
 <script>
@@ -89,66 +95,98 @@ let allParticipants = [];
 let currentUser = null;
 
 const APPS_SCRIPT_URL =
-"https://script.google.com/macros/s/AKfycbxHaeHoqDRuNCIiprWfUrqGswGMz-wuIAU-LWARMrNwDryBQfSmucCNVPYeQb3feGHDVQ/exec";
+"https://script.google.com/macros/s/AKfycbzVpWZy_ynStCKd700c87ky84G-QrkgzmFsA-rpOpj6Uv3I5Dn2FV56SZRRkf9GndEMwg/exec";
 
 async function loadParticipants() {
-    const res = await fetch(APPS_SCRIPT_URL);
-    allParticipants = await res.json();
+  const res = await fetch(APPS_SCRIPT_URL);
+  allParticipants = await res.json();
 }
 
 async function login() {
-    const username = document.getElementById("username").value.trim();
-    const password = document.getElementById("password").value.trim();
-    const errorMsg = document.getElementById("errorMsg");
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
+  const errorMsg = document.getElementById("errorMsg");
 
-    await loadParticipants();
+  await loadParticipants();
 
-    const user = allParticipants.find(p =>
-        `${p.nome} ${p.cognome}`.toLowerCase() === username.toLowerCase() &&
-        String(p.password) === password
-    );
+  const user = allParticipants.find(p =>
+    `${p.nome} ${p.cognome}`.toLowerCase() === username.toLowerCase() &&
+    String(p.password) === password
+  );
 
-    if (!user) {
-        errorMsg.textContent = "Nome o password errati";
-        return;
-    }
+  if (!user) {
+    errorMsg.textContent = "Nome o password errati";
+    return;
+  }
 
-    currentUser = user;
-    showDashboard();
+  currentUser = user;
+
+  document.getElementById("loginScreen").classList.add("hidden");
+
+  if (user.ruolo === "insegnante") {
+    showTeacher();
+  } else {
+    showStudent();
+  }
 }
 
-function showDashboard() {
-    document.getElementById("loginScreen").style.display = "none";
-    document.getElementById("dashboardScreen").style.display = "block";
+function showStudent() {
+  document.getElementById("studentDashboard").classList.remove("hidden");
 
-    const attended = currentUser.presenze.length;
+  const attended = currentUser.presenze.length;
 
-    document.getElementById("userNameDisplay").textContent =
-        `Benvenuto ${currentUser.nome}`;
-    document.getElementById("activityDisplay").textContent =
-        currentUser.attività;
+  document.getElementById("studentName").textContent =
+    `Benvenuto ${currentUser.nome}`;
+  document.getElementById("studentActivity").textContent =
+    currentUser.attività;
 
-    document.getElementById("totalLessons").textContent =
-        currentUser.lezioni;
-    document.getElementById("attendedLessons").textContent =
-        attended;
-    document.getElementById("remainingLessons").textContent =
-        currentUser.lezioni - attended;
-    document.getElementById("progressPercent").textContent =
-        Math.round(attended / currentUser.lezioni * 100) + "%";
+  document.getElementById("totalLessons").textContent =
+    currentUser.lezioni;
+  document.getElementById("attendedLessons").textContent =
+    attended;
+  document.getElementById("remainingLessons").textContent =
+    currentUser.lezioni - attended;
+  document.getElementById("progressPercent").textContent =
+    Math.round(attended / currentUser.lezioni * 100) + "%";
 
-    const list = document.getElementById("attendanceList");
-    list.innerHTML = "";
+  const list = document.getElementById("attendanceList");
+  list.innerHTML = "";
+  currentUser.presenze.forEach(p => {
+    const li = document.createElement("li");
+    li.textContent = p;
+    list.appendChild(li);
+  });
+}
 
-    currentUser.presenze.forEach(d => {
-        const li = document.createElement("li");
-        li.textContent = d;
-        list.appendChild(li);
+function showTeacher() {
+  document.getElementById("teacherDashboard").classList.remove("hidden");
+  const list = document.getElementById("teacherList");
+  list.innerHTML = "";
+
+  allParticipants
+    .filter(p => p.ruolo === "allievo")
+    .forEach(p => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        ${p.nome} ${p.cognome}
+        <button onclick="segnaPresenza('${p.nome}','${p.cognome}')">
+          ➕ Presente oggi
+        </button>
+      `;
+      list.appendChild(li);
     });
 }
 
+async function segnaPresenza(nome, cognome) {
+  await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    body: JSON.stringify({ nome, cognome })
+  });
+  alert(`Presenza segnata per ${nome} ${cognome}`);
+}
+
 function logout() {
-    location.reload();
+  location.reload();
 }
 </script>
 
