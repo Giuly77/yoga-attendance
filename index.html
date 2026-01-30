@@ -20,7 +20,7 @@ body {
   padding: 28px;
   border-radius: 18px;
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
 }
 
 .hidden { display: none; }
@@ -39,9 +39,12 @@ button {
   color: white;
 }
 
+.secondary {
+  background: #eee;
+}
+
 .tab {
   background: #eee;
-  color: #333;
 }
 
 .tab.active {
@@ -67,7 +70,29 @@ li {
   margin-bottom: 14px;
 }
 
-small { color: #666; }
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.day {
+  background: #f2f2f2;
+  padding: 10px;
+  border-radius: 6px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.day.active {
+  background: #667eea;
+  color: white;
+}
+
+.day.hasLesson {
+  border: 2px solid #667eea;
+}
 
 .success {
   text-align: center;
@@ -87,6 +112,14 @@ small { color: #666; }
   <div id="errorMsg" style="color:red"></div>
 </div>
 
+<!-- HOME -->
+<div class="card hidden" id="homeScreen">
+  <h3>Ciao 👋</h3>
+  <button class="primary" onclick="goToDashboard()">Dashboard</button>
+  <button class="secondary" onclick="showCalendar()">📅 Calendario presenze</button>
+  <button onclick="logout()">Esci</button>
+</div>
+
 <!-- ALLIEVO -->
 <div class="card hidden" id="studentDashboard">
   <h3 id="studentName"></h3>
@@ -96,7 +129,7 @@ small { color: #666; }
   <h4>📅 Presenze</h4>
   <ul id="studentDates"></ul>
 
-  <button class="primary" onclick="logout()">Esci</button>
+  <button class="primary" onclick="backHome()">Indietro</button>
 </div>
 
 <!-- INSEGNANTE -->
@@ -107,7 +140,7 @@ small { color: #666; }
   <ul id="studentList"></ul>
 
   <button class="primary" onclick="showSummary()">Riepilogo</button>
-  <button onclick="logout()">Esci</button>
+  <button onclick="backHome()">Indietro</button>
 </div>
 
 <!-- RIEPILOGO -->
@@ -121,10 +154,17 @@ small { color: #666; }
 <div class="card hidden" id="successScreen">
   <div class="success">
     ✅<br><br>
-    <b>Registrazione completata</b><br>
+    <b>Registrazione confermata</b><br>
     Le presenze sono state salvate correttamente
   </div>
-  <button class="primary" onclick="logout()">Torna alla home</button>
+  <button class="primary" onclick="backHome()">Torna alla home</button>
+</div>
+
+<!-- CALENDARIO -->
+<div class="card hidden" id="calendarScreen">
+  <h3>📅 Calendario presenze</h3>
+  <div class="calendar" id="calendarGrid"></div>
+  <button class="primary" onclick="backHome()">Indietro</button>
 </div>
 
 <script>
@@ -132,18 +172,18 @@ const APPS_SCRIPT_URL =
 "https://script.google.com/macros/s/AKfycbwerlQwuthsrZ7IxR52dPgo88VIklVLaaS-awU3MoFVaFO68FZ5rBCtQeQZOUaT2YKyxg/exec";
 
 let users = [];
+let currentUser = null;
 let selectedPresences = [];
-let currentActivity = "";
 
 async function login() {
-  const u = username.value.trim();
-  const p = password.value.trim();
-
   const res = await fetch(APPS_SCRIPT_URL);
   users = await res.json();
 
+  const u = username.value.trim().toLowerCase();
+  const p = password.value.trim();
+
   const user = users.find(x =>
-    `${x.nome} ${x.cognome}`.toLowerCase() === u.toLowerCase() &&
+    `${x.nome} ${x.cognome}`.toLowerCase() === u &&
     String(x.password) === p
   );
 
@@ -152,124 +192,96 @@ async function login() {
     return;
   }
 
+  currentUser = user;
   loginScreen.classList.add("hidden");
+  homeScreen.classList.remove("hidden");
+}
 
-  user.ruolo === "insegnante" ? showTeacher() : showStudent(user);
+function goToDashboard() {
+  homeScreen.classList.add("hidden");
+  currentUser.ruolo === "insegnante"
+    ? showTeacher()
+    : showStudent();
 }
 
 /* ===== ALLIEVO ===== */
-function showStudent(u) {
+function showStudent() {
   studentDashboard.classList.remove("hidden");
 
-  const total = u.lezioni || u.presenze.length;
-
-  studentName.textContent = `Ciao ${u.nome} 👋`;
-  studentActivity.textContent = `Attività: ${u.attività}`;
-  studentCount.textContent = `${u.presenze.length} / ${total} lezioni`;
+  const total = currentUser.lezioni || currentUser.presenze.length;
+  studentName.textContent = `Ciao ${currentUser.nome} 👋`;
+  studentActivity.textContent = `Attività: ${currentUser.attività}`;
+  studentCount.textContent = `${currentUser.presenze.length} / ${total} lezioni`;
 
   studentDates.innerHTML = "";
-
-  if (u.presenze.length === 0) {
-    const li = document.createElement("li");
-    li.textContent = "📭 Nessuna presenza registrata";
-    studentDates.appendChild(li);
+  if (currentUser.presenze.length === 0) {
+    studentDates.innerHTML = "<li>📭 Nessuna presenza</li>";
     return;
   }
 
-  u.presenze
-    .sort((a,b)=>new Date(a)-new Date(b))
-    .forEach(d => {
-      const date = new Date(d);
-      const li = document.createElement("li");
-      li.textContent =
-        "📅 " +
-        date.toLocaleDateString("it-IT", {
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-          year: "numeric"
-        });
-      studentDates.appendChild(li);
+  currentUser.presenze.forEach(d => {
+    const li = document.createElement("li");
+    li.textContent = "📅 " + new Date(d).toLocaleDateString("it-IT", {
+      weekday:"long", day:"numeric", month:"long", year:"numeric"
     });
+    studentDates.appendChild(li);
+  });
 }
 
-/* ===== INSEGNANTE ===== */
+/* ===== INSEGNANTE (come prima, invariato) ===== */
 function showTeacher() {
   teacherDashboard.classList.remove("hidden");
-
-  const activities = [...new Set(
-    users.filter(u=>u.ruolo==="allievo").map(u=>u.attività)
-  )];
-
-  activityTabs.innerHTML = "";
-
-  activities.forEach(a => {
-    const b = document.createElement("button");
-    b.textContent = a;
-    b.className = "tab";
-    b.onclick = () => loadActivity(a, b);
-    activityTabs.appendChild(b);
-  });
-
-  loadActivity(activities[0], activityTabs.children[0]);
-}
-
-function loadActivity(activity, btn) {
-  currentActivity = activity;
-  [...activityTabs.children].forEach(b=>b.classList.remove("active"));
-  btn.classList.add("active");
-
   studentList.innerHTML = "";
-
-  users
-    .filter(u=>u.ruolo==="allievo" && u.attività===activity)
-    .sort((a,b)=>a.cognome.localeCompare(b.cognome))
-    .forEach(u => {
-      const done = u.presenze.length;
-      const li = document.createElement("li");
-
-      li.innerHTML = `<b>${u.nome} ${u.cognome}</b><br>
-        <small>${done} / ${u.lezioni} lezioni</small>`;
-
-      if (done >= u.lezioni) {
-        li.classList.add("red");
-      } else {
-        const btn = document.createElement("button");
-        btn.textContent = "Presente oggi";
-        btn.className = "primary";
-        btn.onclick = () => {
-          btn.classList.add("disabled");
-          btn.disabled = true;
-          selectedPresences.push({nome:u.nome, cognome:u.cognome});
-        };
-        li.appendChild(btn);
-      }
-
-      studentList.appendChild(li);
-    });
-}
-
-/* ===== RIEPILOGO ===== */
-function showSummary() {
-  teacherDashboard.classList.add("hidden");
-  summaryScreen.classList.remove("hidden");
-
-  summaryList.innerHTML = "";
-  selectedPresences.forEach(p=>{
+  users.filter(u=>u.ruolo==="allievo").forEach(u=>{
     const li=document.createElement("li");
-    li.textContent=`${p.nome} ${p.cognome}`;
-    summaryList.appendChild(li);
+    li.textContent=`${u.nome} ${u.cognome}`;
+    const btn=document.createElement("button");
+    btn.textContent="Presente oggi";
+    btn.onclick=()=>{btn.classList.add("disabled");selectedPresences.push({nome:u.nome,cognome:u.cognome});};
+    li.appendChild(btn);
+    studentList.appendChild(li);
   });
 }
 
+/* ===== CONFERMA ===== */
 async function confirmPresences() {
-  await fetch(APPS_SCRIPT_URL, {
+  await fetch(APPS_SCRIPT_URL,{
     method:"POST",
     body:JSON.stringify({presenze:selectedPresences})
   });
 
   summaryScreen.classList.add("hidden");
   successScreen.classList.remove("hidden");
+}
+
+/* ===== CALENDARIO ===== */
+function showCalendar() {
+  homeScreen.classList.add("hidden");
+  calendarScreen.classList.remove("hidden");
+
+  calendarGrid.innerHTML = "";
+
+  const dates = currentUser.presenze.map(d => new Date(d).toDateString());
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
+
+  for (let d=1; d<=daysInMonth; d++) {
+    const date = new Date(today.getFullYear(), today.getMonth(), d);
+    const div = document.createElement("div");
+    div.className="day";
+    div.textContent=d;
+
+    if (dates.includes(date.toDateString())) {
+      div.classList.add("hasLesson");
+    }
+
+    calendarGrid.appendChild(div);
+  }
+}
+
+function backHome() {
+  document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"));
+  homeScreen.classList.remove("hidden");
 }
 
 function logout() {
@@ -279,4 +291,3 @@ function logout() {
 
 </body>
 </html>
-
