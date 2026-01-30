@@ -1,0 +1,115 @@
+<script>
+    let allParticipants = [];
+    let currentUser = null;
+
+    const APPS_SCRIPT_URL =
+        "https://script.google.com/macros/s/AKfycbxHaeHoqDRuNCIiprWfUrqGswGMz-wuIAU-LWARMrNwDryBQfSmucCNVPYeQb3feGHDVQ/exec";
+
+    async function loadParticipants() {
+        try {
+            const res = await fetch(APPS_SCRIPT_URL);
+            allParticipants = await res.json();
+            console.log("Dati caricati dal Google Sheet:", allParticipants);
+        } catch (err) {
+            console.error(err);
+            document.getElementById("errorMsg").textContent =
+                "Errore nel caricamento dei dati dal server.";
+        }
+    }
+
+    async function login() {
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value.trim();
+        const errorMsg = document.getElementById("errorMsg");
+
+        if (!username || !password) {
+            errorMsg.textContent = "Inserisci nome e password";
+            return;
+        }
+
+        // carica SEMPRE i dati aggiornati
+        await loadParticipants();
+
+        const user = allParticipants.find(p =>
+            (`${p.nome} ${p.cognome}`).toLowerCase() === username.toLowerCase() &&
+            String(p.password) === password
+        );
+
+        if (!user) {
+            errorMsg.textContent = "Nome o password incorretti";
+            return;
+        }
+
+        currentUser = user;
+        errorMsg.textContent = "";
+        showDashboard();
+    }
+
+    function showDashboard() {
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("dashboardScreen").style.display = "block";
+
+        const attended = currentUser.presenze.length;
+        const remaining = currentUser.lezioni - attended;
+        const percentage = Math.round((attended / currentUser.lezioni) * 100);
+
+        document.getElementById("userNameDisplay").textContent =
+            `Benvenuto, ${currentUser.nome}!`;
+        document.getElementById("activityDisplay").textContent =
+            currentUser.attività;
+        document.getElementById("totalLessons").textContent =
+            currentUser.lezioni;
+        document.getElementById("attendedLessons").textContent =
+            attended;
+        document.getElementById("remainingLessons").textContent =
+            remaining;
+        document.getElementById("progressPercent").textContent =
+            percentage + "%";
+
+        const attendanceList = document.getElementById("attendanceList");
+        attendanceList.innerHTML = "";
+
+        if (currentUser.presenze.length === 0) {
+            attendanceList.classList.add("empty");
+            attendanceList.innerHTML =
+                "<li>Nessuna presenza registrata</li>";
+            return;
+        }
+
+        attendanceList.classList.remove("empty");
+
+        currentUser.presenze
+            .sort((a, b) => new Date(a) - new Date(b))
+            .forEach(date => {
+                const dateObj = new Date(date);
+                const formatted = dateObj.toLocaleDateString("it-IT", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric"
+                });
+
+                const li = document.createElement("li");
+                li.textContent =
+                    formatted.charAt(0).toUpperCase() + formatted.slice(1);
+                attendanceList.appendChild(li);
+            });
+    }
+
+    function logout() {
+        currentUser = null;
+        document.getElementById("loginScreen").style.display = "block";
+        document.getElementById("dashboardScreen").style.display = "none";
+        document.getElementById("username").value = "";
+        document.getElementById("password").value = "";
+        document.getElementById("errorMsg").textContent = "";
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        document
+            .getElementById("password")
+            .addEventListener("keypress", e => {
+                if (e.key === "Enter") login();
+            });
+    });
+</script>
