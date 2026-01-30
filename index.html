@@ -17,18 +17,23 @@ body {
 
 .card {
   background: white;
-  padding: 30px;
-  border-radius: 12px;
+  padding: 25px;
+  border-radius: 14px;
   width: 100%;
-  max-width: 420px;
+  max-width: 460px;
 }
 
 .hidden { display: none; }
 
-button {
+h2, h3 { margin-top: 0; }
+
+input, button {
   width: 100%;
   padding: 10px;
   margin-top: 10px;
+}
+
+button {
   background: #667eea;
   color: white;
   border: none;
@@ -36,10 +41,21 @@ button {
   cursor: pointer;
 }
 
-input {
-  width: 100%;
-  padding: 10px;
-  margin-top: 10px;
+button.disabled {
+  background: white;
+  color: #999;
+  border: 1px solid #ddd;
+  cursor: default;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tabs button {
+  flex: 1;
 }
 
 ul {
@@ -47,12 +63,19 @@ ul {
   padding: 0;
 }
 
-li::before {
-  content: "✓ ";
-  color: green;
+li {
+  margin-bottom: 10px;
 }
 
-.error { color: red; margin-top: 10px; }
+li span {
+  font-size: 13px;
+  color: #555;
+}
+
+.success {
+  text-align: center;
+  font-size: 18px;
+}
 </style>
 </head>
 
@@ -64,125 +87,129 @@ li::before {
   <input id="username" placeholder="Nome Cognome">
   <input id="password" type="password" placeholder="Password">
   <button onclick="login()">Accedi</button>
-  <div class="error" id="errorMsg"></div>
-</div>
-
-<!-- ALLIEVO -->
-<div class="card hidden" id="studentDashboard">
-  <h3 id="studentName"></h3>
-  <p id="studentActivity"></p>
-
-  <p>Totale lezioni: <b id="totalLessons"></b></p>
-  <p>Presenze: <b id="attendedLessons"></b></p>
-  <p>Rimanenti: <b id="remainingLessons"></b></p>
-  <p>Progressione: <b id="progressPercent"></b></p>
-
-  <h4>Presenze</h4>
-  <ul id="attendanceList"></ul>
-
-  <button onclick="logout()">Esci</button>
+  <div id="errorMsg" style="color:red"></div>
 </div>
 
 <!-- INSEGNANTE -->
 <div class="card hidden" id="teacherDashboard">
   <h3>👩‍🏫 Modalità Insegnante</h3>
-  <ul id="teacherList"></ul>
+
+  <div class="tabs" id="activityTabs"></div>
+  <ul id="studentList"></ul>
+
+  <button onclick="showSummary()">Riepilogo</button>
   <button onclick="logout()">Esci</button>
 </div>
 
+<!-- RIEPILOGO -->
+<div class="card hidden" id="summaryScreen">
+  <h3>🧾 Riepilogo presenze</h3>
+  <ul id="summaryList"></ul>
+  <button onclick="confirmPresences()">Conferma</button>
+</div>
+
+<!-- SUCCESS -->
+<div class="card hidden" id="successScreen">
+  <div class="success">✅<br><br>I dati sono stati caricati con successo</div>
+</div>
+
 <script>
-let allParticipants = [];
-let currentUser = null;
-
 const APPS_SCRIPT_URL =
-"https://script.google.com/macros/s/AKfycbzVpWZy_ynStCKd700c87ky84G-QrkgzmFsA-rpOpj6Uv3I5Dn2FV56SZRRkf9GndEMwg/exec";
+"https://script.google.com/macros/s/AKfycbwerlQwuthsrZ7IxR52dPgo88VIklVLaaS-awU3MoFVaFO68FZ5rBCtQeQZOUaT2YKyxg/exec";
 
-async function loadParticipants() {
-  const res = await fetch(APPS_SCRIPT_URL);
-  allParticipants = await res.json();
-}
+let allUsers = [];
+let selectedPresences = [];
+let currentActivity = "";
 
 async function login() {
-  const username = document.getElementById("username").value.trim();
-  const password = document.getElementById("password").value.trim();
-  const errorMsg = document.getElementById("errorMsg");
+  const u = username.value.trim();
+  const p = password.value.trim();
 
-  await loadParticipants();
+  const res = await fetch(APPS_SCRIPT_URL);
+  allUsers = await res.json();
 
-  const user = allParticipants.find(p =>
-    `${p.nome} ${p.cognome}`.toLowerCase() === username.toLowerCase() &&
-    String(p.password) === password
+  const user = allUsers.find(x =>
+    `${x.nome} ${x.cognome}`.toLowerCase() === u.toLowerCase()
+    && String(x.password) === p
   );
 
   if (!user) {
-    errorMsg.textContent = "Nome o password errati";
+    errorMsg.textContent = "Credenziali errate";
     return;
   }
 
-  currentUser = user;
-
-  document.getElementById("loginScreen").classList.add("hidden");
+  loginScreen.classList.add("hidden");
 
   if (user.ruolo === "insegnante") {
     showTeacher();
-  } else {
-    showStudent();
   }
 }
 
-function showStudent() {
-  document.getElementById("studentDashboard").classList.remove("hidden");
+function showTeacher() {
+  teacherDashboard.classList.remove("hidden");
 
-  const attended = currentUser.presenze.length;
+  const activities = [...new Set(
+    allUsers.filter(u => u.ruolo === "allievo").map(u => u.attività)
+  )];
 
-  document.getElementById("studentName").textContent =
-    `Benvenuto ${currentUser.nome}`;
-  document.getElementById("studentActivity").textContent =
-    currentUser.attività;
-
-  document.getElementById("totalLessons").textContent =
-    currentUser.lezioni;
-  document.getElementById("attendedLessons").textContent =
-    attended;
-  document.getElementById("remainingLessons").textContent =
-    currentUser.lezioni - attended;
-  document.getElementById("progressPercent").textContent =
-    Math.round(attended / currentUser.lezioni * 100) + "%";
-
-  const list = document.getElementById("attendanceList");
-  list.innerHTML = "";
-  currentUser.presenze.forEach(p => {
-    const li = document.createElement("li");
-    li.textContent = p;
-    list.appendChild(li);
+  activityTabs.innerHTML = "";
+  activities.forEach(a => {
+    const b = document.createElement("button");
+    b.textContent = a;
+    b.onclick = () => loadActivity(a);
+    activityTabs.appendChild(b);
   });
+
+  loadActivity(activities[0]);
 }
 
-function showTeacher() {
-  document.getElementById("teacherDashboard").classList.remove("hidden");
-  const list = document.getElementById("teacherList");
-  list.innerHTML = "";
+function loadActivity(activity) {
+  currentActivity = activity;
+  studentList.innerHTML = "";
 
-  allParticipants
-    .filter(p => p.ruolo === "allievo")
-    .forEach(p => {
+  allUsers
+    .filter(u => u.ruolo === "allievo" && u.attività === activity)
+    .sort((a,b) => a.cognome.localeCompare(b.cognome))
+    .forEach(u => {
+      const done = u.presenze.length;
       const li = document.createElement("li");
-      li.innerHTML = `
-        ${p.nome} ${p.cognome}
-        <button onclick="segnaPresenza('${p.nome}','${p.cognome}')">
-          ➕ Presente oggi
-        </button>
-      `;
-      list.appendChild(li);
+
+      const btn = document.createElement("button");
+      btn.textContent = "Presente oggi";
+      btn.onclick = () => {
+        btn.classList.add("disabled");
+        btn.disabled = true;
+        selectedPresences.push({ nome: u.nome, cognome: u.cognome });
+      };
+
+      li.innerHTML = `<b>${u.nome} ${u.cognome}</b><br>
+        <span>${done} / ${u.lezioni} lezioni</span>`;
+      li.appendChild(btn);
+
+      studentList.appendChild(li);
     });
 }
 
-async function segnaPresenza(nome, cognome) {
+function showSummary() {
+  teacherDashboard.classList.add("hidden");
+  summaryScreen.classList.remove("hidden");
+
+  summaryList.innerHTML = "";
+  selectedPresences.forEach(p => {
+    const li = document.createElement("li");
+    li.textContent = `${p.nome} ${p.cognome}`;
+    summaryList.appendChild(li);
+  });
+}
+
+async function confirmPresences() {
   await fetch(APPS_SCRIPT_URL, {
     method: "POST",
-    body: JSON.stringify({ nome, cognome })
+    body: JSON.stringify({ presenze: selectedPresences })
   });
-  alert(`Presenza segnata per ${nome} ${cognome}`);
+
+  summaryScreen.classList.add("hidden");
+  successScreen.classList.remove("hidden");
 }
 
 function logout() {
