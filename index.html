@@ -17,8 +17,8 @@ body {
 
 .card {
   background: white;
-  padding: 25px;
-  border-radius: 16px;
+  padding: 28px;
+  border-radius: 18px;
   width: 100%;
   max-width: 480px;
 }
@@ -27,7 +27,7 @@ body {
 
 button {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   margin-top: 10px;
   border-radius: 8px;
   border: none;
@@ -56,9 +56,7 @@ button {
   cursor: default;
 }
 
-.red {
-  color: #e74c3c;
-}
+.red { color: #e74c3c; }
 
 ul {
   list-style: none;
@@ -66,12 +64,10 @@ ul {
 }
 
 li {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
-small {
-  color: #666;
-}
+small { color: #666; }
 
 .success {
   text-align: center;
@@ -95,7 +91,6 @@ small {
 <div class="card hidden" id="studentDashboard">
   <h3 id="studentName"></h3>
   <p id="studentActivity"></p>
-
   <p>📊 <b id="studentCount"></b></p>
 
   <h4>📅 Presenze</h4>
@@ -148,8 +143,8 @@ async function login() {
   users = await res.json();
 
   const user = users.find(x =>
-    `${x.nome} ${x.cognome}`.toLowerCase() === u.toLowerCase()
-    && String(x.password) === p
+    `${x.nome} ${x.cognome}`.toLowerCase() === u.toLowerCase() &&
+    String(x.password) === p
   );
 
   if (!user) {
@@ -159,34 +154,53 @@ async function login() {
 
   loginScreen.classList.add("hidden");
 
-  if (user.ruolo === "insegnante") showTeacher();
-  else showStudent(user);
+  user.ruolo === "insegnante" ? showTeacher() : showStudent(user);
 }
 
+/* ===== ALLIEVO ===== */
 function showStudent(u) {
   studentDashboard.classList.remove("hidden");
 
+  const total = u.lezioni || u.presenze.length;
+
   studentName.textContent = `Ciao ${u.nome} 👋`;
   studentActivity.textContent = `Attività: ${u.attività}`;
-  studentCount.textContent = `${u.presenze.length} / ${u.lezioni} lezioni`;
+  studentCount.textContent = `${u.presenze.length} / ${total} lezioni`;
 
   studentDates.innerHTML = "";
+
+  if (u.presenze.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "📭 Nessuna presenza registrata";
+    studentDates.appendChild(li);
+    return;
+  }
+
   u.presenze
     .sort((a,b)=>new Date(a)-new Date(b))
     .forEach(d => {
       const date = new Date(d);
       const li = document.createElement("li");
-      li.textContent = "📅 " + date.toLocaleDateString("it-IT", {
-        weekday:"long", day:"numeric", month:"long", year:"numeric"
-      });
+      li.textContent =
+        "📅 " +
+        date.toLocaleDateString("it-IT", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric"
+        });
       studentDates.appendChild(li);
     });
 }
 
+/* ===== INSEGNANTE ===== */
 function showTeacher() {
   teacherDashboard.classList.remove("hidden");
 
-  const activities = [...new Set(users.filter(u=>u.ruolo==="allievo").map(u=>u.attività))];
+  const activities = [...new Set(
+    users.filter(u=>u.ruolo==="allievo").map(u=>u.attività)
+  )];
+
   activityTabs.innerHTML = "";
 
   activities.forEach(a => {
@@ -208,13 +222,12 @@ function loadActivity(activity, btn) {
   studentList.innerHTML = "";
 
   users
-    .filter(u => u.ruolo==="allievo" && u.attività===activity)
+    .filter(u=>u.ruolo==="allievo" && u.attività===activity)
     .sort((a,b)=>a.cognome.localeCompare(b.cognome))
     .forEach(u => {
       const done = u.presenze.length;
-      const ratio = done / u.lezioni;
-
       const li = document.createElement("li");
+
       li.innerHTML = `<b>${u.nome} ${u.cognome}</b><br>
         <small>${done} / ${u.lezioni} lezioni</small>`;
 
@@ -236,6 +249,7 @@ function loadActivity(activity, btn) {
     });
 }
 
+/* ===== RIEPILOGO ===== */
 function showSummary() {
   teacherDashboard.classList.add("hidden");
   summaryScreen.classList.remove("hidden");
