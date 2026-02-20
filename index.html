@@ -76,42 +76,6 @@ select,input{
   font-size:14px;
   margin-bottom:15px;
 }
-
-.calendar{
-  display:grid;
-  grid-template-columns:repeat(7,1fr);
-  gap:6px;
-  margin-top:10px;
-}
-
-.day{
-  background:#f2f2f2;
-  padding:10px;
-  border-radius:8px;
-  text-align:center;
-  font-size:13px;
-  cursor:pointer;
-}
-
-.day.hasLesson{
-  border:2px solid #667eea;
-  font-weight:600;
-}
-
-.alphaIndex{
-  position:absolute;
-  right:-25px;
-  top:180px;
-  display:flex;
-  flex-direction:column;
-  font-size:11px;
-  font-weight:bold;
-  color:#667eea;
-}
-.alphaIndex div{
-  padding:2px 4px;
-  cursor:pointer;
-}
 </style>
 </head>
 <body>
@@ -156,12 +120,10 @@ select,input{
 
   <select id="activitySelect" onchange="loadActivity()"></select>
 
-  <ul id="studentList"></ul>
-
-  <!-- 🔍 Ricerca sotto lista -->
+  <!-- 🔍 Ricerca -->
   <input id="searchInput" placeholder="🔍 Cerca nome..." oninput="loadActivity()">
 
-  <div class="alphaIndex" id="alphaIndex"></div>
+  <ul id="studentList"></ul>
 
 </div>
 
@@ -169,29 +131,19 @@ select,input{
 <div class="card hidden" id="summaryScreen">
   <h3>🧾 Riepilogo presenze</h3>
   <ul id="summaryList"></ul>
-  <button class="primary" onclick="confirmPresences()">Conferma</button>
+  <button class="primary" id="confirmBtn" onclick="confirmPresences()">Conferma</button>
   <button class="danger" onclick="cancelSummary()">Annulla</button>
-</div>
-
-<!-- CALENDARIO -->
-<div class="card hidden" id="calendarScreen">
-  <div class="topbar">
-    <button onclick="backHome()">Home</button>
-  </div>
-  <h3 id="calendarTitle"></h3>
-  <div class="calendar" id="calendarGrid"></div>
-  <div id="calendarDetails" style="margin-top:10px;"></div>
 </div>
 
 <script>
 const APPS_SCRIPT_URL="https://script.google.com/macros/s/AKfycbwerlQwuthsrZ7IxR52dPgo88VIklVLaaS-awU3MoFVaFO68FZ5rBCtQeQZOUaT2YKyxg/exec";
 
 let users=[],currentUser=null,selectedPresences=[];
-let calDate=new Date();
 const today=new Date().toDateString();
 
 /* LOGIN */
 async function login(){
+  loginBtn.classList.add("disabled");
   loginBtn.disabled=true;
   loginBtn.textContent="Caricamento...";
 
@@ -213,12 +165,14 @@ async function login(){
     loginScreen.classList.add("hidden");
     homeScreen.classList.remove("hidden");
 
+    /* 🔒 Nasconde calendario agli allievi */
     if(currentUser.ruolo==="allievo"){
       document.getElementById("calendarBtn").style.display="none";
     }
 
   }catch(err){
     errorMsg.textContent=err.message;
+    loginBtn.classList.remove("disabled");
     loginBtn.disabled=false;
     loginBtn.textContent="Accedi";
   }
@@ -239,7 +193,6 @@ function logout(){location.reload();}
 /* ALLIEVO */
 function renderStudent(){
   studentDashboard.classList.remove("hidden");
-
   const fatte=currentUser.presenze.length;
   const tot=currentUser.lezioni;
 
@@ -267,7 +220,6 @@ function renderTeacher(){
   teacherDashboard.classList.remove("hidden");
   selectedPresences=[];
   renderTodayReminder();
-  buildAlphabetIndex();
 
   const activities=[...new Set(users.filter(u=>u.ruolo==="allievo").map(u=>u.attività))];
 
@@ -282,8 +234,10 @@ function renderTeacher(){
   loadActivity();
 }
 
+/* 🟣 Reminder con numero */
 function renderTodayReminder(){
   todayReminder.innerHTML="";
+
   const todayUsers=users.filter(u=>
     u.ruolo==="allievo" &&
     u.presenze.some(p=>new Date(p).toDateString()===today)
@@ -304,6 +258,7 @@ function renderTodayReminder(){
   todayReminder.appendChild(box);
 }
 
+/* Lista sempre visibile + filtro */
 function loadActivity(){
   const activity=activitySelect.value;
   const search=document.getElementById("searchInput").value.toLowerCase();
@@ -311,14 +266,16 @@ function loadActivity(){
 
   users.filter(u=>
     u.ruolo==="allievo" &&
-    u.attività===activity &&
-    (u.nome+" "+u.cognome).toLowerCase().includes(search)
+    u.attività===activity
   )
   .sort((a,b)=> (a.cognome+" "+a.nome).localeCompare(b.cognome+" "+b.nome))
   .forEach(u=>{
 
+    const fullName=(u.nome+" "+u.cognome).toLowerCase();
+
+    if(search && !fullName.includes(search)) return;
+
     const li=document.createElement("li");
-    li.id="letter-"+u.cognome[0].toUpperCase();
 
     const fatte=u.presenze.length;
     const tot=u.lezioni;
@@ -351,61 +308,6 @@ function loadActivity(){
   });
 }
 
-/* INDICE */
-function buildAlphabetIndex(){
-  alphaIndex.innerHTML="";
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(l=>{
-    const div=document.createElement("div");
-    div.textContent=l;
-    div.onclick=()=>{
-      const el=document.getElementById("letter-"+l);
-      if(el) el.scrollIntoView({behavior:"smooth"});
-    };
-    alphaIndex.appendChild(div);
-  });
-}
-
-/* CALENDARIO */
-function openCalendar(){
-  document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"));
-  calendarScreen.classList.remove("hidden");
-  renderCalendar();
-}
-
-function renderCalendar(){
-  calendarGrid.innerHTML="";
-  calendarDetails.innerHTML="";
-  calendarTitle.textContent=calDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
-
-  const y=calDate.getFullYear();
-  const m=calDate.getMonth();
-  const days=new Date(y,m+1,0).getDate();
-
-  for(let d=1; d<=days; d++){
-    const date=new Date(y,m,d).toDateString();
-    const div=document.createElement("div");
-    div.className="day";
-    div.textContent=d;
-
-    const lessons=users.filter(u=>
-      u.presenze.some(p=>new Date(p).toDateString()===date)
-    );
-
-    if(lessons.length) div.classList.add("hasLesson");
-
-    div.onclick=()=>{
-      calendarDetails.innerHTML="";
-      lessons.forEach(u=>{
-        const p=document.createElement("div");
-        p.textContent=u.attività+": "+u.nome+" "+u.cognome;
-        calendarDetails.appendChild(p);
-      });
-    };
-
-    calendarGrid.appendChild(div);
-  }
-}
-
 /* RIEPILOGO */
 function showSummary(){
   teacherDashboard.classList.add("hidden");
@@ -418,15 +320,21 @@ function showSummary(){
   });
 }
 
+/* Conferma = stesso schema del tuo codice */
 function confirmPresences(){
+  confirmBtn.classList.add("disabled");
+  confirmBtn.disabled=true;
   summaryScreen.classList.add("hidden");
   backHome();
+  alert("Presenze registrate ✅");
+
   fetch(APPS_SCRIPT_URL,{
     method:"POST",
     body:JSON.stringify({presenze:selectedPresences})
   });
 }
 
+/* Annulla */
 function cancelSummary(){
   selectedPresences=[];
   summaryScreen.classList.add("hidden");
