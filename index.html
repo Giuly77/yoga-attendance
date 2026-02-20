@@ -108,6 +108,12 @@ select,input{
   padding:2px 6px;
   border-radius:10px;
 }
+
+.monthNav{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
 </style>
 </head>
 <body>
@@ -151,8 +157,10 @@ select,input{
 
   <select id="activitySelect" onchange="loadActivity()"></select>
 
+  <!-- 🔍 Barra ricerca visibile -->
   <input id="searchInput" placeholder="🔍 Cerca nome..." oninput="loadActivity()">
 
+  <!-- 📋 Lista sempre visibile -->
   <ul id="studentList"></ul>
 </div>
 
@@ -169,7 +177,13 @@ select,input{
   <div class="topbar">
     <button class="secondary" onclick="backHome()">Home</button>
   </div>
-  <h3 id="calendarTitle"></h3>
+
+  <div class="monthNav">
+    <button class="secondary" onclick="changeMonth(-1)">◀</button>
+    <h3 id="calendarTitle"></h3>
+    <button class="secondary" onclick="changeMonth(1)">▶</button>
+  </div>
+
   <div class="calendar" id="calendarGrid"></div>
   <div id="calendarDetails" style="margin-top:10px;"></div>
 </div>
@@ -226,20 +240,6 @@ function backHome(){
 
 function logout(){location.reload();}
 
-/* AGGIORNAMENTO AUTOMATICO */
-async function refreshData(){
-  const res=await fetch(APPS_SCRIPT_URL);
-  users=await res.json();
-
-  if(currentUser.ruolo==="insegnante"){
-    renderTeacher();
-    renderCalendar();
-  }else{
-    currentUser=users.find(u=>u.nome===currentUser.nome && u.cognome===currentUser.cognome);
-    renderStudent();
-  }
-}
-
 /* CALENDARIO */
 function openCalendar(){
   if(currentUser.ruolo!=="insegnante") return;
@@ -248,10 +248,16 @@ function openCalendar(){
   renderCalendar();
 }
 
+function changeMonth(offset){
+  calDate.setMonth(calDate.getMonth()+offset);
+  renderCalendar();
+}
+
 function renderCalendar(){
   calendarGrid.innerHTML="";
   calendarDetails.innerHTML="";
-  calendarTitle.textContent=calDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
+  calendarTitle.textContent=
+    calDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
 
   const y=calDate.getFullYear();
   const m=calDate.getMonth();
@@ -385,6 +391,7 @@ function loadActivity(){
       btn.textContent="Presente";
       btn.className="primary";
       btn.onclick=()=>{
+        btn.classList.add("disabled");
         btn.disabled=true;
         selectedPresences.push({nome:u.nome,cognome:u.cognome});
       };
@@ -408,7 +415,12 @@ function showSummary(){
 }
 
 async function confirmPresences(){
+  confirmBtn.classList.add("disabled");
   confirmBtn.disabled=true;
+
+  summaryScreen.classList.add("hidden");
+  backHome();
+  alert("Presenze registrate ✅");
 
   await fetch(APPS_SCRIPT_URL,{
     method:"POST",
@@ -416,10 +428,6 @@ async function confirmPresences(){
   });
 
   selectedPresences=[];
-  summaryScreen.classList.add("hidden");
-  alert("Presenze registrate ✅");
-  await refreshData();
-  backHome();
 }
 
 function cancelSummary(){
@@ -431,4 +439,3 @@ function cancelSummary(){
 
 </body>
 </html>
-
