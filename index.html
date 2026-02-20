@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Registro elettronico 📒</title>
 
 <style>
@@ -17,15 +17,12 @@ body{
   background:white;
   padding:20px;
   border-radius:18px;
-  width:100%;
   max-width:500px;
   margin:auto;
   box-shadow:0 5px 15px rgba(0,0,0,0.1);
 }
 
 .hidden{display:none}
-
-h3{margin-top:0}
 
 button{
   width:100%;
@@ -39,30 +36,28 @@ button{
 .primary{background:#667eea;color:white}
 .secondary{background:#eee}
 
-.topbar{
-  display:flex;
-  gap:8px;
-  margin-bottom:15px;
-}
-
-.topbar button{
-  flex:1;
-  margin-top:0;
-}
-
 .disabled{
   background:white!important;
   color:#aaa!important;
   border:1px solid #ddd;
 }
 
-.red{color:#e74c3c;font-weight:600;font-size:14px}
+.topbar{
+  display:flex;
+  gap:8px;
+  margin-bottom:15px;
+}
+
+.topbar button{flex:1;margin-top:0}
 
 ul{list-style:none;padding:0;margin:0}
 li{
-  padding:10px 0;
+  padding:12px 0;
   border-bottom:1px solid #f0f0f0;
 }
+
+.red{color:#e74c3c;font-weight:600}
+.green{color:#2ecc71;font-weight:600}
 
 select{
   width:100%;
@@ -70,17 +65,8 @@ select{
   border-radius:10px;
   margin-bottom:15px;
 }
-
-.reminder{
-  background:#f3f0ff;
-  padding:10px;
-  border-radius:10px;
-  font-size:13px;
-  margin-bottom:15px;
-}
 </style>
 </head>
-
 <body>
 
 <!-- LOGIN -->
@@ -111,18 +97,13 @@ select{
 
 <!-- INSEGNANTE -->
 <div class="card hidden" id="teacherDashboard">
-
   <div class="topbar">
     <button class="secondary" onclick="backHome()">Indietro</button>
     <button class="primary" onclick="showSummary()">Riepilogo</button>
   </div>
 
-  <div id="reminderBox"></div>
-
   <select id="activitySelect" onchange="loadActivity()"></select>
-
   <ul id="studentList"></ul>
-
 </div>
 
 <!-- RIEPILOGO -->
@@ -159,7 +140,6 @@ async function login(){
     if(!user) throw new Error("Credenziali errate");
 
     currentUser=user;
-
     loginScreen.classList.add("hidden");
     homeScreen.classList.remove("hidden");
 
@@ -193,7 +173,14 @@ function renderStudent(){
   studentDashboard.classList.remove("hidden");
   studentName.textContent="Ciao "+currentUser.nome;
   studentActivity.textContent="Attività: "+currentUser.attività;
-  studentCount.textContent=currentUser.presenze.length+"/"+currentUser.lezioni;
+
+  const fatte=currentUser.presenze.length;
+  const tot=currentUser.lezioni;
+
+  studentCount.textContent=fatte+" / "+tot+" lezioni";
+  if(fatte>tot){
+    studentCount.classList.add("red");
+  }
 
   studentDates.innerHTML="";
   currentUser.presenze.forEach(d=>{
@@ -208,36 +195,8 @@ function renderTeacher(){
   teacherDashboard.classList.remove("hidden");
   selectedPresences=[];
 
-  /* Reminder */
-  const reminderBox=document.getElementById("reminderBox");
-  reminderBox.innerHTML="";
-  const reminder=document.createElement("div");
-  reminder.className="reminder";
-  reminder.innerHTML="<b>Presenze segnate oggi</b><br>";
-
-  const todayPres=users.filter(u=>
-    u.ruolo==="allievo" &&
-    u.presenze.some(p=>new Date(p).toDateString()===today)
-  );
-
-  if(!todayPres.length){
-    reminder.innerHTML+="Nessuna presenza";
-  }else{
-    const groups={};
-    todayPres.forEach(u=>{
-      if(!groups[u.attività]) groups[u.attività]=[];
-      groups[u.attività].push(u.nome+" "+u.cognome);
-    });
-
-    for(const g in groups){
-      reminder.innerHTML+=`<b>${g}</b>: ${groups[g].join(", ")}<br>`;
-    }
-  }
-
-  reminderBox.appendChild(reminder);
-
-  /* Attività */
   const activities=[...new Set(users.filter(u=>u.ruolo==="allievo").map(u=>u.attività))];
+
   activitySelect.innerHTML="";
   activities.forEach(a=>{
     const opt=document.createElement("option");
@@ -258,27 +217,28 @@ function loadActivity(){
     .forEach(u=>{
 
       const li=document.createElement("li");
-      const alreadyToday=u.presenze.some(p=>new Date(p).toDateString()===today);
+      const fatte=u.presenze.length;
+      const tot=u.lezioni;
 
-      li.innerHTML="<b>"+u.cognome+" "+u.nome+"</b>";
+      const nameLine=document.createElement("div");
+      nameLine.innerHTML="<b>"+u.cognome+" "+u.nome+"</b> ("+fatte+" / "+tot+")";
 
-      if(alreadyToday){
-        const red=document.createElement("div");
-        red.className="red";
-        red.textContent="Segnato presente oggi a "+u.attività;
-        li.appendChild(red);
-      }else{
-        const btn=document.createElement("button");
-        btn.textContent="Presente";
-        btn.className="primary";
-        btn.onclick=()=>{
-          btn.classList.add("disabled");
-          btn.disabled=true;
-          selectedPresences.push({nome:u.nome,cognome:u.cognome});
-        };
-        li.appendChild(btn);
+      if(fatte>tot){
+        nameLine.classList.add("red");
       }
 
+      li.appendChild(nameLine);
+
+      const btn=document.createElement("button");
+      btn.textContent="Presente";
+      btn.className="primary";
+      btn.onclick=()=>{
+        btn.classList.add("disabled");
+        btn.disabled=true;
+        selectedPresences.push({nome:u.nome,cognome:u.cognome});
+      };
+
+      li.appendChild(btn);
       studentList.appendChild(li);
     });
 }
@@ -296,24 +256,24 @@ function showSummary(){
   });
 }
 
-async function confirmPresences(){
+/* CONFERMA VELOCE */
+function confirmPresences(){
   confirmBtn.classList.add("disabled");
   confirmBtn.disabled=true;
   confirmBtn.textContent="Registrazione...";
 
-  await fetch(APPS_SCRIPT_URL,{
-    method:"POST",
-    body:JSON.stringify({presenze:selectedPresences})
-  });
+  summaryScreen.classList.add("hidden");
+  backHome();
 
   alert("Presenze registrate ✅");
 
-  summaryScreen.classList.add("hidden");
-  backHome();   // 🔥 ORA TORNA ALLA HOME
+  fetch(APPS_SCRIPT_URL,{
+    method:"POST",
+    body:JSON.stringify({presenze:selectedPresences})
+  }).catch(err=>console.error(err));
 }
 </script>
 
 </body>
 </html>
-
 
