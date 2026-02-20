@@ -86,16 +86,27 @@ select,input{
 
 .day{
   background:#f2f2f2;
-  padding:10px;
+  padding:8px;
   border-radius:8px;
   text-align:center;
   font-size:13px;
   cursor:pointer;
+  position:relative;
 }
 
 .day.hasLesson{
   border:2px solid #667eea;
-  font-weight:600;
+}
+
+.badge{
+  position:absolute;
+  bottom:4px;
+  right:4px;
+  background:#667eea;
+  color:white;
+  font-size:11px;
+  padding:2px 6px;
+  border-radius:10px;
 }
 </style>
 </head>
@@ -130,7 +141,6 @@ select,input{
 
 <!-- INSEGNANTE -->
 <div class="card hidden" id="teacherDashboard">
-
   <div class="topbar">
     <button class="secondary" onclick="backHome()">Home</button>
     <button class="secondary" onclick="openCalendar()">📅</button>
@@ -144,7 +154,6 @@ select,input{
   <input id="searchInput" placeholder="🔍 Cerca nome..." oninput="loadActivity()">
 
   <ul id="studentList"></ul>
-
 </div>
 
 <!-- RIEPILOGO -->
@@ -195,12 +204,8 @@ async function login(){
     loginScreen.classList.add("hidden");
     homeScreen.classList.remove("hidden");
 
-    const calendarBtn=document.getElementById("calendarBtn");
-    if(currentUser.ruolo==="insegnante"){
-      calendarBtn.style.display="block";
-    }else{
-      calendarBtn.style.display="none";
-    }
+    calendarBtn.style.display =
+      currentUser.ruolo==="insegnante" ? "block" : "none";
 
   }catch(err){
     errorMsg.textContent=err.message;
@@ -221,10 +226,23 @@ function backHome(){
 
 function logout(){location.reload();}
 
+/* AGGIORNAMENTO AUTOMATICO */
+async function refreshData(){
+  const res=await fetch(APPS_SCRIPT_URL);
+  users=await res.json();
+
+  if(currentUser.ruolo==="insegnante"){
+    renderTeacher();
+    renderCalendar();
+  }else{
+    currentUser=users.find(u=>u.nome===currentUser.nome && u.cognome===currentUser.cognome);
+    renderStudent();
+  }
+}
+
 /* CALENDARIO */
 function openCalendar(){
   if(currentUser.ruolo!=="insegnante") return;
-
   document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"));
   calendarScreen.classList.remove("hidden");
   renderCalendar();
@@ -249,7 +267,13 @@ function renderCalendar(){
       u.presenze.some(p=>new Date(p).toDateString()===date)
     );
 
-    if(lessons.length) div.classList.add("hasLesson");
+    if(lessons.length){
+      div.classList.add("hasLesson");
+      const badge=document.createElement("div");
+      badge.className="badge";
+      badge.textContent=lessons.length;
+      div.appendChild(badge);
+    }
 
     div.onclick=()=>{
       calendarDetails.innerHTML="";
@@ -311,7 +335,6 @@ function renderTeacher(){
 
 function renderTodayReminder(){
   todayReminder.innerHTML="";
-
   const todayUsers=users.filter(u=>
     u.ruolo==="allievo" &&
     u.presenze.some(p=>new Date(p).toDateString()===today)
@@ -321,27 +344,20 @@ function renderTodayReminder(){
   box.className="reminder";
   box.innerHTML="<b>🟣 Presenze segnate oggi ("+todayUsers.length+")</b><br>";
 
-  if(!todayUsers.length){
-    box.innerHTML+="Nessuna presenza registrata";
-  }else{
-    todayUsers.forEach(u=>{
-      box.innerHTML+="✔ "+u.nome+" "+u.cognome+" ("+u.attività+")<br>";
-    });
-  }
+  todayUsers.forEach(u=>{
+    box.innerHTML+="✔ "+u.nome+" "+u.cognome+" ("+u.attività+")<br>";
+  });
 
   todayReminder.appendChild(box);
 }
 
 function loadActivity(){
   const activity=activitySelect.value;
-  const search=document.getElementById("searchInput").value.toLowerCase();
+  const search=searchInput.value.toLowerCase();
   studentList.innerHTML="";
 
-  users.filter(u=>
-    u.ruolo==="allievo" &&
-    u.attività===activity
-  )
-  .sort((a,b)=> (a.cognome+" "+a.nome).localeCompare(b.cognome+" "+b.nome))
+  users.filter(u=>u.ruolo==="allievo" && u.attività===activity)
+  .sort((a,b)=>(a.cognome+" "+a.nome).localeCompare(b.cognome+" "+b.nome))
   .forEach(u=>{
 
     const fullName=(u.nome+" "+u.cognome).toLowerCase();
@@ -369,7 +385,6 @@ function loadActivity(){
       btn.textContent="Presente";
       btn.className="primary";
       btn.onclick=()=>{
-        btn.classList.add("disabled");
         btn.disabled=true;
         selectedPresences.push({nome:u.nome,cognome:u.cognome});
       };
@@ -392,17 +407,19 @@ function showSummary(){
   });
 }
 
-function confirmPresences(){
-  confirmBtn.classList.add("disabled");
+async function confirmPresences(){
   confirmBtn.disabled=true;
-  summaryScreen.classList.add("hidden");
-  backHome();
-  alert("Presenze registrate ✅");
 
-  fetch(APPS_SCRIPT_URL,{
+  await fetch(APPS_SCRIPT_URL,{
     method:"POST",
     body:JSON.stringify({presenze:selectedPresences})
   });
+
+  selectedPresences=[];
+  summaryScreen.classList.add("hidden");
+  alert("Presenze registrate ✅");
+  await refreshData();
+  backHome();
 }
 
 function cancelSummary(){
@@ -414,3 +431,4 @@ function cancelSummary(){
 
 </body>
 </html>
+
