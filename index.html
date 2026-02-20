@@ -32,12 +32,11 @@ button{
   border-radius:8px;
   border:none;
   cursor:pointer;
+  transition:0.2s;
 }
 
 .primary{background:#667eea;color:white}
 .secondary{background:#eee}
-.tab{background:#eee}
-.tab.active{background:#667eea;color:white}
 
 .disabled{
   background:white!important;
@@ -89,8 +88,8 @@ small{color:#666}
   <h2>Registro elettronico 📒</h2>
   <input id="username" placeholder="Nome Cognome">
   <input id="password" type="password" placeholder="Password">
-  <button class="primary" onclick="login()">Accedi</button>
-  <div id="errorMsg" style="color:red"></div>
+  <button class="primary" id="loginBtn" onclick="login()">Accedi</button>
+  <div id="errorMsg" style="color:red;margin-top:10px;"></div>
 </div>
 
 <!-- HOME -->
@@ -112,8 +111,7 @@ small{color:#666}
 </div>
 
 <!-- INSEGNANTE -->
-<div class="card hidden" id="teacherDashboard">
-</div>
+<div class="card hidden" id="teacherDashboard"></div>
 
 <!-- RIEPILOGO -->
 <div class="card hidden" id="summaryScreen">
@@ -143,25 +141,42 @@ const today=new Date().toDateString();
 
 /* LOGIN */
 async function login(){
-  const res=await fetch(APPS_SCRIPT_URL);
-  users=await res.json();
 
-  const u=username.value.trim().toLowerCase();
-  const p=password.value.trim();
+  loginBtn.classList.add("disabled");
+  loginBtn.disabled=true;
+  loginBtn.textContent="Caricamento...";
+  errorMsg.textContent="";
 
-  const user=users.find(x=>
-    `${x.nome} ${x.cognome}`.toLowerCase()===u &&
-    String(x.password)===p
-  );
+  try{
+    const res=await fetch(APPS_SCRIPT_URL);
+    if(!res.ok) throw new Error("Errore connessione server");
 
-  if(!user){errorMsg.textContent="Credenziali errate";return;}
+    users=await res.json();
 
-  currentUser=user;
-  loginScreen.classList.add("hidden");
-  homeScreen.classList.remove("hidden");
+    const u=username.value.trim().toLowerCase();
+    const p=password.value.trim();
 
-  if(currentUser.ruolo!=="insegnante"){
-    calendarBtn.style.display="none";
+    const user=users.find(x=>
+      `${x.nome} ${x.cognome}`.toLowerCase()===u &&
+      String(x.password)===p
+    );
+
+    if(!user) throw new Error("Credenziali errate");
+
+    currentUser=user;
+
+    loginScreen.classList.add("hidden");
+    homeScreen.classList.remove("hidden");
+
+    if(currentUser.ruolo!=="insegnante"){
+      calendarBtn.style.display="none";
+    }
+
+  }catch(err){
+    errorMsg.textContent=err.message;
+    loginBtn.classList.remove("disabled");
+    loginBtn.disabled=false;
+    loginBtn.textContent="Accedi";
   }
 }
 
@@ -181,10 +196,9 @@ function logout(){location.reload();}
 /* ALLIEVO */
 function renderStudent(){
   studentDashboard.classList.remove("hidden");
-
   studentName.textContent=`Ciao ${currentUser.nome}`;
   studentActivity.textContent=`Attività: ${currentUser.attività}`;
-  studentCount.textContent=`${currentUser.presenze.length}/${currentUser.lezioni} lezioni`;
+  studentCount.textContent=`${currentUser.presenze.length}/${currentUser.lezioni}`;
 
   studentDates.innerHTML="";
   currentUser.presenze.forEach(d=>{
@@ -200,7 +214,6 @@ function renderTeacher(){
   teacherDashboard.classList.remove("hidden");
   selectedPresences=[];
 
-  /* Reminder */
   const reminder=document.createElement("div");
   reminder.className="reminder";
   reminder.innerHTML="<b>🟣 Presenze segnate oggi</b><br>";
@@ -291,6 +304,7 @@ function showSummary(){
 async function confirmPresences(){
   confirmBtn.classList.add("disabled");
   confirmBtn.disabled=true;
+  confirmBtn.textContent="Registrazione...";
 
   await fetch(APPS_SCRIPT_URL,{
     method:"POST",
@@ -303,7 +317,7 @@ async function confirmPresences(){
   renderTeacher();
 }
 
-/* CALENDARIO SOLO INSEGNANTE */
+/* CALENDARIO */
 function openCalendar(){
   if(currentUser.ruolo!=="insegnante") return;
   homeScreen.classList.add("hidden");
@@ -352,6 +366,7 @@ function renderCalendar(){
 
 </body>
 </html>
+
 
 
 
