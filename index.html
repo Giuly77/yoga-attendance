@@ -76,6 +76,27 @@ select,input{
   font-size:14px;
   margin-bottom:15px;
 }
+
+.calendar{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:6px;
+  margin-top:10px;
+}
+
+.day{
+  background:#f2f2f2;
+  padding:10px;
+  border-radius:8px;
+  text-align:center;
+  font-size:13px;
+  cursor:pointer;
+}
+
+.day.hasLesson{
+  border:2px solid #667eea;
+  font-weight:600;
+}
 </style>
 </head>
 <body>
@@ -134,15 +155,25 @@ select,input{
   <button class="danger" onclick="cancelSummary()">Annulla</button>
 </div>
 
+<!-- CALENDARIO -->
+<div class="card hidden" id="calendarScreen">
+  <div class="topbar">
+    <button class="secondary" onclick="backHome()">Home</button>
+  </div>
+  <h3 id="calendarTitle"></h3>
+  <div class="calendar" id="calendarGrid"></div>
+  <div id="calendarDetails" style="margin-top:10px;"></div>
+</div>
+
 <script>
 const APPS_SCRIPT_URL="https://script.google.com/macros/s/AKfycbwerlQwuthsrZ7IxR52dPgo88VIklVLaaS-awU3MoFVaFO68FZ5rBCtQeQZOUaT2YKyxg/exec";
 
 let users=[],currentUser=null,selectedPresences=[];
+let calDate=new Date();
 const today=new Date().toDateString();
 
 /* LOGIN */
 async function login(){
-  loginBtn.classList.add("disabled");
   loginBtn.disabled=true;
   loginBtn.textContent="Caricamento...";
 
@@ -164,8 +195,7 @@ async function login(){
     loginScreen.classList.add("hidden");
     homeScreen.classList.remove("hidden");
 
-    /* 🔒 Mostra calendario SOLO insegnante */
-    const calendarBtn = document.getElementById("calendarBtn");
+    const calendarBtn=document.getElementById("calendarBtn");
     if(currentUser.ruolo==="insegnante"){
       calendarBtn.style.display="block";
     }else{
@@ -174,7 +204,6 @@ async function login(){
 
   }catch(err){
     errorMsg.textContent=err.message;
-    loginBtn.classList.remove("disabled");
     loginBtn.disabled=false;
     loginBtn.textContent="Accedi";
   }
@@ -192,13 +221,195 @@ function backHome(){
 
 function logout(){location.reload();}
 
-/* 🔒 Sicurezza extra */
+/* CALENDARIO */
 function openCalendar(){
   if(currentUser.ruolo!=="insegnante") return;
-  alert("Calendario visibile solo all'insegnante");
+
+  document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"));
+  calendarScreen.classList.remove("hidden");
+  renderCalendar();
 }
 
-/* resto del codice invariato */
+function renderCalendar(){
+  calendarGrid.innerHTML="";
+  calendarDetails.innerHTML="";
+  calendarTitle.textContent=calDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
+
+  const y=calDate.getFullYear();
+  const m=calDate.getMonth();
+  const days=new Date(y,m+1,0).getDate();
+
+  for(let d=1; d<=days; d++){
+    const date=new Date(y,m,d).toDateString();
+    const div=document.createElement("div");
+    div.className="day";
+    div.textContent=d;
+
+    const lessons=users.filter(u=>
+      u.presenze.some(p=>new Date(p).toDateString()===date)
+    );
+
+    if(lessons.length) div.classList.add("hasLesson");
+
+    div.onclick=()=>{
+      calendarDetails.innerHTML="";
+      lessons.forEach(u=>{
+        const p=document.createElement("div");
+        p.textContent=u.attività+": "+u.nome+" "+u.cognome;
+        calendarDetails.appendChild(p);
+      });
+    };
+
+    calendarGrid.appendChild(div);
+  }
+}
+
+/* ALLIEVO */
+function renderStudent(){
+  studentDashboard.classList.remove("hidden");
+
+  const fatte=currentUser.presenze.length;
+  const tot=currentUser.lezioni;
+
+  studentName.textContent="🌟 Ciao "+currentUser.nome+"!";
+  studentActivity.textContent="💃 Attività: "+currentUser.attività;
+  studentCount.textContent="📊 "+fatte+" / "+tot+" lezioni";
+
+  if(fatte>tot) studentCount.classList.add("red");
+
+  motivationalMsg.textContent=
+    fatte===0?"✨ Inizia oggi!"
+    :fatte<tot?"💪 Continua così!"
+    :"🎉 Pacchetto completato!";
+
+  studentDates.innerHTML="";
+  currentUser.presenze.forEach(d=>{
+    const li=document.createElement("li");
+    li.textContent="📅 "+new Date(d).toLocaleDateString("it-IT");
+    studentDates.appendChild(li);
+  });
+}
+
+/* INSEGNANTE */
+function renderTeacher(){
+  teacherDashboard.classList.remove("hidden");
+  selectedPresences=[];
+  renderTodayReminder();
+
+  const activities=[...new Set(users.filter(u=>u.ruolo==="allievo").map(u=>u.attività))];
+
+  activitySelect.innerHTML="";
+  activities.forEach(a=>{
+    const opt=document.createElement("option");
+    opt.value=a;
+    opt.textContent=a;
+    activitySelect.appendChild(opt);
+  });
+
+  loadActivity();
+}
+
+function renderTodayReminder(){
+  todayReminder.innerHTML="";
+
+  const todayUsers=users.filter(u=>
+    u.ruolo==="allievo" &&
+    u.presenze.some(p=>new Date(p).toDateString()===today)
+  );
+
+  const box=document.createElement("div");
+  box.className="reminder";
+  box.innerHTML="<b>🟣 Presenze segnate oggi ("+todayUsers.length+")</b><br>";
+
+  if(!todayUsers.length){
+    box.innerHTML+="Nessuna presenza registrata";
+  }else{
+    todayUsers.forEach(u=>{
+      box.innerHTML+="✔ "+u.nome+" "+u.cognome+" ("+u.attività+")<br>";
+    });
+  }
+
+  todayReminder.appendChild(box);
+}
+
+function loadActivity(){
+  const activity=activitySelect.value;
+  const search=document.getElementById("searchInput").value.toLowerCase();
+  studentList.innerHTML="";
+
+  users.filter(u=>
+    u.ruolo==="allievo" &&
+    u.attività===activity
+  )
+  .sort((a,b)=> (a.cognome+" "+a.nome).localeCompare(b.cognome+" "+b.nome))
+  .forEach(u=>{
+
+    const fullName=(u.nome+" "+u.cognome).toLowerCase();
+    if(search && !fullName.includes(search)) return;
+
+    const li=document.createElement("li");
+
+    const fatte=u.presenze.length;
+    const tot=u.lezioni;
+    const alreadyToday=u.presenze.some(p=>new Date(p).toDateString()===today);
+
+    const name=document.createElement("div");
+    name.innerHTML="<b>"+u.cognome+" "+u.nome+"</b> ("+fatte+" / "+tot+")";
+    if(fatte>tot) name.classList.add("red");
+
+    li.appendChild(name);
+
+    if(alreadyToday){
+      const tag=document.createElement("div");
+      tag.className="green";
+      tag.textContent="già segnato presente";
+      li.appendChild(tag);
+    }else{
+      const btn=document.createElement("button");
+      btn.textContent="Presente";
+      btn.className="primary";
+      btn.onclick=()=>{
+        btn.classList.add("disabled");
+        btn.disabled=true;
+        selectedPresences.push({nome:u.nome,cognome:u.cognome});
+      };
+      li.appendChild(btn);
+    }
+
+    studentList.appendChild(li);
+  });
+}
+
+/* RIEPILOGO */
+function showSummary(){
+  teacherDashboard.classList.add("hidden");
+  summaryScreen.classList.remove("hidden");
+  summaryList.innerHTML="";
+  selectedPresences.forEach(p=>{
+    const li=document.createElement("li");
+    li.textContent=p.cognome+" "+p.nome;
+    summaryList.appendChild(li);
+  });
+}
+
+function confirmPresences(){
+  confirmBtn.classList.add("disabled");
+  confirmBtn.disabled=true;
+  summaryScreen.classList.add("hidden");
+  backHome();
+  alert("Presenze registrate ✅");
+
+  fetch(APPS_SCRIPT_URL,{
+    method:"POST",
+    body:JSON.stringify({presenze:selectedPresences})
+  });
+}
+
+function cancelSummary(){
+  selectedPresences=[];
+  summaryScreen.classList.add("hidden");
+  renderTeacher();
+}
 </script>
 
 </body>
