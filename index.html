@@ -2,81 +2,81 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Registro elettronico 📒</title>
 
 <style>
 body{
   font-family:system-ui,sans-serif;
   background:linear-gradient(135deg,#667eea,#764ba2);
-  min-height:100vh;
-  display:flex;
-  justify-content:center;
-  align-items:center;
+  margin:0;
+  padding:15px;
 }
 
 .card{
   background:white;
-  padding:28px;
+  padding:20px;
   border-radius:18px;
   width:100%;
-  max-width:550px;
+  max-width:500px;
+  margin:auto;
+  box-shadow:0 5px 15px rgba(0,0,0,0.1);
 }
 
 .hidden{display:none}
 
+h3{margin-top:0}
+
 button{
   width:100%;
-  padding:12px;
+  padding:14px;
   margin-top:10px;
-  border-radius:8px;
+  border-radius:12px;
   border:none;
-  cursor:pointer;
-  transition:0.2s;
+  font-size:16px;
 }
 
 .primary{background:#667eea;color:white}
 .secondary{background:#eee}
 
+.topbar{
+  display:flex;
+  gap:8px;
+  margin-bottom:15px;
+}
+
+.topbar button{
+  flex:1;
+  margin-top:0;
+}
+
 .disabled{
   background:white!important;
   color:#aaa!important;
   border:1px solid #ddd;
-  cursor:default;
 }
 
-.red{color:#e74c3c;font-weight:600}
+.red{color:#e74c3c;font-weight:600;font-size:14px}
 
-ul{list-style:none;padding:0}
-li{margin-bottom:14px}
-small{color:#666}
-
-.calendar{
-  display:grid;
-  grid-template-columns:repeat(7,1fr);
-  gap:6px;
-  margin-top:10px;
+ul{list-style:none;padding:0;margin:0}
+li{
+  padding:10px 0;
+  border-bottom:1px solid #f0f0f0;
 }
 
-.day{
-  background:#f2f2f2;
-  padding:10px;
-  border-radius:6px;
-  text-align:center;
-  cursor:pointer;
-}
-
-.day.hasLesson{
-  border:2px solid #667eea;
-  font-weight:600;
+select{
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  margin-bottom:15px;
 }
 
 .reminder{
   background:#f3f0ff;
   padding:10px;
   border-radius:10px;
+  font-size:13px;
   margin-bottom:15px;
-  font-size:14px;
 }
 </style>
 </head>
@@ -85,9 +85,9 @@ small{color:#666}
 
 <!-- LOGIN -->
 <div class="card" id="loginScreen">
-  <h2>Registro elettronico 📒</h2>
-  <input id="username" placeholder="Nome Cognome">
-  <input id="password" type="password" placeholder="Password">
+  <h3>Registro elettronico 📒</h3>
+  <input id="username" placeholder="Nome Cognome" style="width:100%;padding:12px;margin-bottom:10px;border-radius:8px;">
+  <input id="password" type="password" placeholder="Password" style="width:100%;padding:12px;border-radius:8px;">
   <button class="primary" id="loginBtn" onclick="login()">Accedi</button>
   <div id="errorMsg" style="color:red;margin-top:10px;"></div>
 </div>
@@ -96,7 +96,7 @@ small{color:#666}
 <div class="card hidden" id="homeScreen">
   <h3>Benvenuto 👋</h3>
   <button class="primary" onclick="goDashboard()">Dashboard</button>
-  <button class="secondary" id="calendarBtn" onclick="openCalendar()">📅 Calendario presenze</button>
+  <button class="secondary" id="calendarBtn" onclick="openCalendar()">📅 Calendario</button>
   <button onclick="logout()">Esci</button>
 </div>
 
@@ -104,53 +104,48 @@ small{color:#666}
 <div class="card hidden" id="studentDashboard">
   <h3 id="studentName"></h3>
   <p id="studentActivity"></p>
-  <p>📊 <b id="studentCount"></b></p>
-  <h4>📅 Presenze</h4>
+  <p><b id="studentCount"></b></p>
   <ul id="studentDates"></ul>
   <button class="primary" onclick="backHome()">Indietro</button>
 </div>
 
 <!-- INSEGNANTE -->
-<div class="card hidden" id="teacherDashboard"></div>
+<div class="card hidden" id="teacherDashboard">
+
+  <div class="topbar">
+    <button class="secondary" onclick="backHome()">Indietro</button>
+    <button class="primary" onclick="showSummary()">Riepilogo</button>
+  </div>
+
+  <div id="reminderBox"></div>
+
+  <select id="activitySelect" onchange="loadActivity()"></select>
+
+  <ul id="studentList"></ul>
+
+</div>
 
 <!-- RIEPILOGO -->
 <div class="card hidden" id="summaryScreen">
-  <h3>🧾 Riepilogo presenze</h3>
+  <h3>Riepilogo presenze</h3>
   <ul id="summaryList"></ul>
   <button class="primary" id="confirmBtn" onclick="confirmPresences()">Conferma</button>
-</div>
-
-<!-- CALENDARIO -->
-<div class="card hidden" id="calendarScreen">
-  <h3 id="calendarTitle"></h3>
-  <div>
-    <button onclick="changeMonth(-1)">◀</button>
-    <button onclick="changeMonth(1)">▶</button>
-  </div>
-  <div class="calendar" id="calendarGrid"></div>
-  <div id="calendarDetails"></div>
-  <button class="primary" onclick="backHome()">Indietro</button>
 </div>
 
 <script>
 const APPS_SCRIPT_URL="https://script.google.com/macros/s/AKfycbwerlQwuthsrZ7IxR52dPgo88VIklVLaaS-awU3MoFVaFO68FZ5rBCtQeQZOUaT2YKyxg/exec";
 
 let users=[],currentUser=null,selectedPresences=[];
-let calDate=new Date();
 const today=new Date().toDateString();
 
 /* LOGIN */
 async function login(){
-
   loginBtn.classList.add("disabled");
   loginBtn.disabled=true;
   loginBtn.textContent="Caricamento...";
-  errorMsg.textContent="";
 
   try{
     const res=await fetch(APPS_SCRIPT_URL);
-    if(!res.ok) throw new Error("Errore connessione server");
-
     users=await res.json();
 
     const u=username.value.trim().toLowerCase();
@@ -196,9 +191,9 @@ function logout(){location.reload();}
 /* ALLIEVO */
 function renderStudent(){
   studentDashboard.classList.remove("hidden");
-  studentName.textContent=`Ciao ${currentUser.nome}`;
-  studentActivity.textContent=`Attività: ${currentUser.attività}`;
-  studentCount.textContent=`${currentUser.presenze.length}/${currentUser.lezioni}`;
+  studentName.textContent="Ciao "+currentUser.nome;
+  studentActivity.textContent="Attività: "+currentUser.attività;
+  studentCount.textContent=currentUser.presenze.length+"/"+currentUser.lezioni;
 
   studentDates.innerHTML="";
   currentUser.presenze.forEach(d=>{
@@ -210,13 +205,15 @@ function renderStudent(){
 
 /* INSEGNANTE */
 function renderTeacher(){
-  teacherDashboard.innerHTML="";
   teacherDashboard.classList.remove("hidden");
   selectedPresences=[];
 
+  /* Reminder */
+  const reminderBox=document.getElementById("reminderBox");
+  reminderBox.innerHTML="";
   const reminder=document.createElement("div");
   reminder.className="reminder";
-  reminder.innerHTML="<b>🟣 Presenze segnate oggi</b><br>";
+  reminder.innerHTML="<b>Presenze segnate oggi</b><br>";
 
   const todayPres=users.filter(u=>
     u.ruolo==="allievo" &&
@@ -224,7 +221,7 @@ function renderTeacher(){
   );
 
   if(!todayPres.length){
-    reminder.innerHTML+="Nessuna presenza registrata";
+    reminder.innerHTML+="Nessuna presenza";
   }else{
     const groups={};
     todayPres.forEach(u=>{
@@ -237,55 +234,53 @@ function renderTeacher(){
     }
   }
 
-  teacherDashboard.appendChild(reminder);
+  reminderBox.appendChild(reminder);
 
+  /* Attività */
   const activities=[...new Set(users.filter(u=>u.ruolo==="allievo").map(u=>u.attività))];
-
-  activities.forEach(activity=>{
-    const title=document.createElement("h4");
-    title.textContent=activity;
-    teacherDashboard.appendChild(title);
-
-    users.filter(u=>u.ruolo==="allievo" && u.attività===activity)
-      .sort((a,b)=>a.cognome.localeCompare(b.cognome))
-      .forEach(u=>{
-
-        const li=document.createElement("li");
-        const alreadyToday=u.presenze.some(p=>new Date(p).toDateString()===today);
-
-        li.innerHTML=`<b>${u.nome} ${u.cognome}</b><br><small>${u.presenze.length}/${u.lezioni}</small>`;
-
-        if(alreadyToday){
-          const red=document.createElement("div");
-          red.className="red";
-          red.textContent=`Segnato presente oggi a ${u.attività}`;
-          li.appendChild(red);
-        }else{
-          const btn=document.createElement("button");
-          btn.textContent="Presente oggi";
-          btn.className="primary";
-          btn.onclick=()=>{
-            btn.classList.add("disabled");
-            btn.disabled=true;
-            selectedPresences.push({nome:u.nome,cognome:u.cognome});
-          };
-          li.appendChild(btn);
-        }
-
-        teacherDashboard.appendChild(li);
-      });
+  activitySelect.innerHTML="";
+  activities.forEach(a=>{
+    const opt=document.createElement("option");
+    opt.value=a;
+    opt.textContent=a;
+    activitySelect.appendChild(opt);
   });
 
-  const summaryBtn=document.createElement("button");
-  summaryBtn.textContent="Riepilogo";
-  summaryBtn.className="primary";
-  summaryBtn.onclick=showSummary;
-  teacherDashboard.appendChild(summaryBtn);
+  loadActivity();
+}
 
-  const backBtn=document.createElement("button");
-  backBtn.textContent="Indietro";
-  backBtn.onclick=backHome;
-  teacherDashboard.appendChild(backBtn);
+function loadActivity(){
+  const activity=activitySelect.value;
+  studentList.innerHTML="";
+
+  users.filter(u=>u.ruolo==="allievo" && u.attività===activity)
+    .sort((a,b)=> (a.cognome+" "+a.nome).localeCompare(b.cognome+" "+b.nome))
+    .forEach(u=>{
+
+      const li=document.createElement("li");
+      const alreadyToday=u.presenze.some(p=>new Date(p).toDateString()===today);
+
+      li.innerHTML="<b>"+u.cognome+" "+u.nome+"</b>";
+
+      if(alreadyToday){
+        const red=document.createElement("div");
+        red.className="red";
+        red.textContent="Segnato presente oggi a "+u.attività;
+        li.appendChild(red);
+      }else{
+        const btn=document.createElement("button");
+        btn.textContent="Presente";
+        btn.className="primary";
+        btn.onclick=()=>{
+          btn.classList.add("disabled");
+          btn.disabled=true;
+          selectedPresences.push({nome:u.nome,cognome:u.cognome});
+        };
+        li.appendChild(btn);
+      }
+
+      studentList.appendChild(li);
+    });
 }
 
 /* RIEPILOGO */
@@ -296,7 +291,7 @@ function showSummary(){
 
   selectedPresences.forEach(p=>{
     const li=document.createElement("li");
-    li.textContent=p.nome+" "+p.cognome;
+    li.textContent=p.cognome+" "+p.nome;
     summaryList.appendChild(li);
   });
 }
@@ -314,59 +309,11 @@ async function confirmPresences(){
   alert("Presenze registrate ✅");
 
   summaryScreen.classList.add("hidden");
-  renderTeacher();
-}
-
-/* CALENDARIO */
-function openCalendar(){
-  if(currentUser.ruolo!=="insegnante") return;
-  homeScreen.classList.add("hidden");
-  calendarScreen.classList.remove("hidden");
-  renderCalendar();
-}
-
-function changeMonth(n){
-  calDate.setMonth(calDate.getMonth()+n);
-  renderCalendar();
-}
-
-function renderCalendar(){
-  calendarGrid.innerHTML="";
-  calendarDetails.innerHTML="";
-  calendarTitle.textContent=calDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
-
-  const y=calDate.getFullYear(),m=calDate.getMonth();
-  const days=new Date(y,m+1,0).getDate();
-
-  for(let d=1;d<=days;d++){
-    const date=new Date(y,m,d).toDateString();
-    const div=document.createElement("div");
-    div.className="day";
-    div.textContent=d;
-
-    const lessons=users.filter(u=>
-      u.presenze.some(p=>new Date(p).toDateString()===date)
-    );
-
-    if(lessons.length) div.classList.add("hasLesson");
-
-    div.onclick=()=>{
-      calendarDetails.innerHTML="";
-      lessons.forEach(u=>{
-        const p=document.createElement("p");
-        p.textContent=`${u.attività}: ${u.nome} ${u.cognome}`;
-        calendarDetails.appendChild(p);
-      });
-    };
-
-    calendarGrid.appendChild(div);
-  }
+  backHome();   // 🔥 ORA TORNA ALLA HOME
 }
 </script>
 
 </body>
 </html>
-
-
 
 
