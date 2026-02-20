@@ -52,7 +52,6 @@ button{
 .topbar button{flex:1;margin-top:0}
 
 ul{list-style:none;padding:0;margin:0}
-
 li{
   padding:12px 0;
   border-bottom:1px solid #f0f0f0;
@@ -66,7 +65,7 @@ select,input{
   width:100%;
   padding:12px;
   border-radius:10px;
-  margin-bottom:12px;
+  margin-top:12px;
 }
 
 .reminder{
@@ -77,26 +76,41 @@ select,input{
   margin-bottom:15px;
 }
 
-/* 🔤 INDICE ALFABETICO */
-.alphaIndex{
-  position:absolute;
-  right:-25px;
-  top:140px;
-  display:flex;
-  flex-direction:column;
-  font-size:11px;
-  color:#667eea;
-  font-weight:bold;
+.calendar{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:6px;
+  margin-top:10px;
 }
 
-.alphaIndex div{
-  padding:2px 4px;
+.day{
+  background:#f2f2f2;
+  padding:10px;
+  border-radius:8px;
+  text-align:center;
+  font-size:13px;
   cursor:pointer;
 }
 
-.alphaIndex div:hover{
-  background:#eee;
-  border-radius:4px;
+.day.hasLesson{
+  border:2px solid #667eea;
+  font-weight:600;
+}
+
+/* Indice alfabetico */
+.alphaIndex{
+  position:absolute;
+  right:-25px;
+  top:160px;
+  display:flex;
+  flex-direction:column;
+  font-size:11px;
+  font-weight:bold;
+  color:#667eea;
+}
+.alphaIndex div{
+  padding:2px 4px;
+  cursor:pointer;
 }
 </style>
 </head>
@@ -115,7 +129,7 @@ select,input{
 <div class="card hidden" id="homeScreen">
   <h3>👋 Benvenuto!</h3>
   <button class="primary" onclick="goDashboard()">Dashboard</button>
-  <button class="secondary" id="calendarBtn" onclick="openCalendar()">📅 Calendario</button>
+  <button class="secondary" onclick="openCalendar()">📅 Calendario</button>
   <button onclick="logout()">Esci</button>
 </div>
 
@@ -141,9 +155,11 @@ select,input{
   <div id="todayReminder"></div>
 
   <select id="activitySelect" onchange="loadActivity()"></select>
-  <input id="searchInput" placeholder="🔍 Cerca nome..." oninput="loadActivity()">
 
   <ul id="studentList"></ul>
+
+  <!-- 🔍 RICERCA SOTTO LA LISTA -->
+  <input id="searchInput" placeholder="🔍 Cerca nome..." oninput="loadActivity()">
 
   <!-- 🔤 INDICE -->
   <div class="alphaIndex" id="alphaIndex"></div>
@@ -157,10 +173,21 @@ select,input{
   <button class="primary" id="confirmBtn" onclick="confirmPresences()">Conferma</button>
 </div>
 
+<!-- CALENDARIO -->
+<div class="card hidden" id="calendarScreen">
+  <div class="topbar">
+    <button onclick="backHome()">Home</button>
+  </div>
+  <h3 id="calendarTitle"></h3>
+  <div class="calendar" id="calendarGrid"></div>
+  <div id="calendarDetails" style="margin-top:10px;"></div>
+</div>
+
 <script>
 const APPS_SCRIPT_URL="https://script.google.com/macros/s/AKfycbwerlQwuthsrZ7IxR52dPgo88VIklVLaaS-awU3MoFVaFO68FZ5rBCtQeQZOUaT2YKyxg/exec";
 
 let users=[],currentUser=null,selectedPresences=[];
+let calDate=new Date();
 const today=new Date().toDateString();
 
 /* LOGIN */
@@ -187,10 +214,6 @@ async function login(){
     loginScreen.classList.add("hidden");
     homeScreen.classList.remove("hidden");
 
-    if(currentUser.ruolo!=="insegnante"){
-      calendarBtn.style.display="none";
-    }
-
   }catch(err){
     errorMsg.textContent=err.message;
     loginBtn.classList.remove("disabled");
@@ -214,7 +237,6 @@ function logout(){location.reload();}
 /* ALLIEVO */
 function renderStudent(){
   studentDashboard.classList.remove("hidden");
-
   const fatte=currentUser.presenze.length;
   const tot=currentUser.lezioni;
 
@@ -281,7 +303,7 @@ function renderTodayReminder(){
 
 function loadActivity(){
   const activity=activitySelect.value;
-  const search=searchInput.value.toLowerCase();
+  const search=document.getElementById("searchInput").value.toLowerCase();
   studentList.innerHTML="";
 
   users.filter(u=>
@@ -326,20 +348,59 @@ function loadActivity(){
   });
 }
 
-/* 🔤 COSTRUZIONE INDICE */
+/* INDICE ALFABETICO */
 function buildAlphabetIndex(){
   alphaIndex.innerHTML="";
-  const letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-
-  letters.forEach(l=>{
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(l=>{
     const div=document.createElement("div");
     div.textContent=l;
     div.onclick=()=>{
       const el=document.getElementById("letter-"+l);
-      if(el) el.scrollIntoView({behavior:"smooth",block:"start"});
+      if(el) el.scrollIntoView({behavior:"smooth"});
     };
     alphaIndex.appendChild(div);
   });
+}
+
+/* CALENDARIO */
+function openCalendar(){
+  document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"));
+  calendarScreen.classList.remove("hidden");
+  renderCalendar();
+}
+
+function renderCalendar(){
+  calendarGrid.innerHTML="";
+  calendarDetails.innerHTML="";
+  calendarTitle.textContent=calDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
+
+  const y=calDate.getFullYear();
+  const m=calDate.getMonth();
+  const days=new Date(y,m+1,0).getDate();
+
+  for(let d=1; d<=days; d++){
+    const date=new Date(y,m,d).toDateString();
+    const div=document.createElement("div");
+    div.className="day";
+    div.textContent=d;
+
+    const lessons=users.filter(u=>
+      u.presenze.some(p=>new Date(p).toDateString()===date)
+    );
+
+    if(lessons.length) div.classList.add("hasLesson");
+
+    div.onclick=()=>{
+      calendarDetails.innerHTML="";
+      lessons.forEach(u=>{
+        const p=document.createElement("div");
+        p.textContent=u.attività+": "+u.nome+" "+u.cognome;
+        calendarDetails.appendChild(p);
+      });
+    };
+
+    calendarGrid.appendChild(div);
+  }
 }
 
 /* RIEPILOGO */
