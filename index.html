@@ -37,6 +37,7 @@ button{
 
 .primary{background:#667eea;color:white}
 .secondary{background:#eee}
+.danger{background:#e74c3c;color:white}
 
 .disabled{
   background:white!important;
@@ -97,11 +98,10 @@ select,input{
   font-weight:600;
 }
 
-/* Indice alfabetico */
 .alphaIndex{
   position:absolute;
   right:-25px;
-  top:160px;
+  top:180px;
   display:flex;
   flex-direction:column;
   font-size:11px;
@@ -129,7 +129,7 @@ select,input{
 <div class="card hidden" id="homeScreen">
   <h3>👋 Benvenuto!</h3>
   <button class="primary" onclick="goDashboard()">Dashboard</button>
-  <button class="secondary" onclick="openCalendar()">📅 Calendario</button>
+  <button class="secondary" id="calendarBtn" onclick="openCalendar()">📅 Calendario</button>
   <button onclick="logout()">Esci</button>
 </div>
 
@@ -149,7 +149,7 @@ select,input{
   <div class="topbar">
     <button class="secondary" onclick="backHome()">Home</button>
     <button class="secondary" onclick="openCalendar()">📅</button>
-    <button class="primary" onclick="showSummary()">Riepilogo</button>
+    <button class="primary" onclick="showSummary()">✅</button>
   </div>
 
   <div id="todayReminder"></div>
@@ -158,10 +158,9 @@ select,input{
 
   <ul id="studentList"></ul>
 
-  <!-- 🔍 RICERCA SOTTO LA LISTA -->
+  <!-- 🔍 Ricerca sotto lista -->
   <input id="searchInput" placeholder="🔍 Cerca nome..." oninput="loadActivity()">
 
-  <!-- 🔤 INDICE -->
   <div class="alphaIndex" id="alphaIndex"></div>
 
 </div>
@@ -170,7 +169,8 @@ select,input{
 <div class="card hidden" id="summaryScreen">
   <h3>🧾 Riepilogo presenze</h3>
   <ul id="summaryList"></ul>
-  <button class="primary" id="confirmBtn" onclick="confirmPresences()">Conferma</button>
+  <button class="primary" onclick="confirmPresences()">Conferma</button>
+  <button class="danger" onclick="cancelSummary()">Annulla</button>
 </div>
 
 <!-- CALENDARIO -->
@@ -192,7 +192,6 @@ const today=new Date().toDateString();
 
 /* LOGIN */
 async function login(){
-  loginBtn.classList.add("disabled");
   loginBtn.disabled=true;
   loginBtn.textContent="Caricamento...";
 
@@ -214,9 +213,12 @@ async function login(){
     loginScreen.classList.add("hidden");
     homeScreen.classList.remove("hidden");
 
+    if(currentUser.ruolo==="allievo"){
+      document.getElementById("calendarBtn").style.display="none";
+    }
+
   }catch(err){
     errorMsg.textContent=err.message;
-    loginBtn.classList.remove("disabled");
     loginBtn.disabled=false;
     loginBtn.textContent="Accedi";
   }
@@ -237,6 +239,7 @@ function logout(){location.reload();}
 /* ALLIEVO */
 function renderStudent(){
   studentDashboard.classList.remove("hidden");
+
   const fatte=currentUser.presenze.length;
   const tot=currentUser.lezioni;
 
@@ -281,14 +284,14 @@ function renderTeacher(){
 
 function renderTodayReminder(){
   todayReminder.innerHTML="";
-  const box=document.createElement("div");
-  box.className="reminder";
-  box.innerHTML="<b>🟣 Presenze segnate oggi</b><br>";
-
   const todayUsers=users.filter(u=>
     u.ruolo==="allievo" &&
     u.presenze.some(p=>new Date(p).toDateString()===today)
   );
+
+  const box=document.createElement("div");
+  box.className="reminder";
+  box.innerHTML="<b>🟣 Presenze segnate oggi ("+todayUsers.length+")</b><br>";
 
   if(!todayUsers.length){
     box.innerHTML+="Nessuna presenza registrata";
@@ -348,7 +351,7 @@ function loadActivity(){
   });
 }
 
-/* INDICE ALFABETICO */
+/* INDICE */
 function buildAlphabetIndex(){
   alphaIndex.innerHTML="";
   "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach(l=>{
@@ -416,16 +419,18 @@ function showSummary(){
 }
 
 function confirmPresences(){
-  confirmBtn.classList.add("disabled");
-  confirmBtn.disabled=true;
   summaryScreen.classList.add("hidden");
   backHome();
-  alert("Presenze registrate ✅");
-
   fetch(APPS_SCRIPT_URL,{
     method:"POST",
     body:JSON.stringify({presenze:selectedPresences})
   });
+}
+
+function cancelSummary(){
+  selectedPresences=[];
+  summaryScreen.classList.add("hidden");
+  renderTeacher();
 }
 </script>
 
